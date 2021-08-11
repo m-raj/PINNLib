@@ -1,21 +1,21 @@
 import scipy.io
 import tensorflow as tf
 import numpy as np
-from pinn import PINN_Elastic2D
-from plot_functions import *
+from base_classes.pinn import PINN_Elastic2D
+from utils.plot_functions import *
 
 # gauss points
-gauss_points = scipy.io.loadmat('/kaggle/input/model-weights/annulus_gauss_pt_wt.mat')['gauss_pt_wt']
+gauss_points = scipy.io.loadmat('mesh/annulus_gauss_pt_wt.mat')['gauss_pt_wt']
 weights = tf.convert_to_tensor(np.prod(gauss_points[:,2:], axis=1), dtype=tf.float64)
 gauss_points = tf.convert_to_tensor(gauss_points[:,:2], dtype=tf.float64)
 
-plot_gauss_points(gauss_points)
+plot_gauss_points(gauss_points, title='Mesh')
 
 # inner boundary
 inner_boundary = tf.stack((tf.cos(np.linspace(0, np.pi/2, 1000)),tf.sin(np.linspace(0, np.pi/2,1000))), axis=1)
 
 # plot nodes
-plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,1,800), tf.linspace(0,1,800))
+plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,4,800), tf.linspace(0,4,800))
 plot_nodes = tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1)
 
 
@@ -42,9 +42,7 @@ class PINN(PINN_Elastic2D):
         for i in range(num_steps):
             self.train_step(self.training_nodes)
             if not(i%print_freq):
-                print('Epoch:\t{0}\tLoss:\t{1}'.format(i+1, self.loss[-1]))
-        
-        
+                print('Epoch:\t{0}\tLoss:\t{1}'.format(i+1, self.loss[-1])) 
         
 pinn = PINN(E=1.0E5,
             nu=0.3,
@@ -56,6 +54,20 @@ pinn = PINN(E=1.0E5,
             activation = tf.nn.relu,
             boundary=inner_boundary)
 
-pinn.train(20)
-
-        
+pinn.set_other_params(P=10)
+pinn.train(2000)
+u = pinn(plot_nodes).numpy()
+condition1 = tf.norm(plot_nodes, axis=1) > 4
+condition2 = tf.norm(plot_nodes, axis=1) < 1
+u[condition1] = np.nan
+u[condition2] = np.nan
+ux = np.reshape(u[:,0], plot_X.shape)
+uy = np.reshape(u[:,1], plot_X.shape)
+plt.figure()
+plt.imshow(ux, origin='lower', cmap='jet')
+plt.colorbar()
+plt.savefig('ux.png')
+plt.figure()
+plt.imshow(uy, origin='lower', cmap='jet')
+plt.colorbar()
+plt.savefig('uy.png')
