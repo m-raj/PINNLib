@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 from base_classes.pinn import PINN_Elastic2D
 from utils.plot_functions import *
+import matplotlib.pyplot as plt
 
 # gauss points
 gauss_points = scipy.io.loadmat('mesh/annulus_gauss_pt_wt.mat')['gauss_pt_wt']
@@ -59,15 +60,5 @@ pinn.train(2000)
 u = pinn(plot_nodes).numpy()
 condition1 = tf.norm(plot_nodes, axis=1) > 4
 condition2 = tf.norm(plot_nodes, axis=1) < 1
-u[condition1] = np.nan
-u[condition2] = np.nan
-ux = np.reshape(u[:,0], plot_X.shape)
-uy = np.reshape(u[:,1], plot_X.shape)
-plt.figure()
-plt.imshow(ux, origin='lower', cmap='jet')
-plt.colorbar()
-plt.savefig('ux.png')
-plt.figure()
-plt.imshow(uy, origin='lower', cmap='jet')
-plt.colorbar()
-plt.savefig('uy.png')
+plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape, conditions=[condition1, condition2])
+plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape, conditions=[condition1, condition2])
