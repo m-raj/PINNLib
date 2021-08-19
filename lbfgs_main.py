@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from base_classes import PINN_Elastic2D
+from base_classes.pinn import PINN_Elastic2D
 from utils.plot_functions import *
 
 # gauss points
@@ -18,7 +18,7 @@ inner_boundary = tf.stack((tf.cos(np.linspace(0, np.pi/2, 1000)),tf.sin(np.linsp
 plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,4,800), tf.linspace(0,4,800))
 plot_nodes = tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1)
 
-class LBFGS(PINN_Elastic2D):
+class Hybrid(PINN_Elastic2D):
     def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary):
         super().__init__(E,
                          nu,
@@ -30,70 +30,39 @@ class LBFGS(PINN_Elastic2D):
         self.training_nodes = training_nodes
         self.boundary = boundary
         
-        # Required for lbfgs
-        part = []
-        count = 0
-        
-        self.shapes = tf.shape_n(self.trainable_variables)
-        self.n_tensors = len(self.shapes)
-        self.idx = []
-        self.iter = tf.Variable(0)
-        self.history = []
-        
-        for i, shape in enumerate(self.shapes):
-            n = np.product(shape)
-            self.idx.append(tf.reshape(tf.range(count, count+1, dtype=tf.int32), shape))
-            part.extend([i]*n)
-            count+=n
-        self.part = tf.constant(part)
-    
-    def assign_new_model_parameters(self, params_1d):
-        params = tf.dynamic_partition(params_1d, self.part, self.n_tensors)
-        for i, (shape, param) in enumerate(zip(self.shapes, params)):
-            self.trainable_variables[i].assign(tf.reshape(param, shape))
-        
-    def value_and_gradient(self, params_1d):
-        with tf.GradientTape() as tape:
-            self.assign_new_model_parameters(params_1d)
-            loss_value = self.compute_loss(self.training_nodes)
-        grads = tape.gradient(loss_value, self.trainable_variables)
-        grads = tf.dynamic_stitch(self.idx, grads)
-        
-        self.iter.assign_add(1)
-        tf.print("Iter:", self.iter, "loss:", loss_value)
-        tf.py_function(self.history.append, inp=[loss_value], Tout=[])
-        
-        return loss_value, grads
-
-    def __call__(self):
-        return self.value_and_gradient
-    
-    def set_other_params(self, P):
+    def set_other_params(self, P=10):
         self.P = P
         
     def traction_work_done(self, x):
         work_done = tf.reduce_mean(tf.reduce_sum(self.P*self.boundary*self(self.boundary), axis=1))*np.pi/2
         return work_done
     
-    def train(self, max_iterations):
-        func = self()
+    def train(self, adam_steps=100, lbfgs=False, lbfgs_steps=50, max_iterations=100, num_correction_pairs=10):
+        
+        # Optimisation steps for Adam
+        for i in range(adam_steps):
+            self.train_step(self.training_nodes)
+               
+        # Optimisation steps for lbfgs
+        if lbfgs:
+            lbfgs_func = self.lbfgs_function()
     
-        # convert initial model parameters to a 1D tf.Tensor
-        init_params = tf.dynamic_stitch(self.idx, self.trainable_variables)
+            # convert initial model parameters to a 1D tf.Tensor
+            init_params = tf.dynamic_stitch(self.idx, self.trainable_weights)
+        
+            # train the model with L-BFGS solver
+            results = tfp.optimizer.lbfgs_minimize(value_and_gradients_function=lbfgs_func,
+                                                   initial_position=init_params,
+                                                   max_iterations=max_iterations,
+                                                   num_correction_pairs=num_correction_pairs)
+        
+            # assign back the update parameters
+            self.assign_new_model_parameters(results.position)
     
-        # train the model with L-BFGS solver
-        results = tfp.optimizer.lbfgs_minimize(
-            value_and_gradients_function=func, initial_position=init_params, max_iterations=max_iterations)
-    
-        # after training, the final optimized parameters are still in results.position
-        # so we have to manually put them back to the model
-        self.assign_new_model_parameters(results.position)
-    
-        # do some prediction
-    
+
 if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
-    pinn = LBFGS(E=1.0E5,
+    pinn = Hybrid(E=1.0E5,
             nu=0.3,
             layer_sizes=[2,30,30,30,2],
             lb = tf.reduce_min(gauss_points, axis=0),
@@ -104,7 +73,11 @@ if __name__=="__main__":
             boundary=inner_boundary)
 
     pinn.set_other_params(P=10)
-    pinn.train(5)
+    
+    pinn.train(adam_steps=10,
+               lbfgs=True,
+               lbfgs_steps=10)
+    
     u = pinn(plot_nodes).numpy()
     condition1 = tf.norm(plot_nodes, axis=1) > 4
     condition2 = tf.norm(plot_nodes, axis=1) < 1

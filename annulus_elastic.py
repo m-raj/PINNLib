@@ -56,7 +56,7 @@ pinn = PINN(E=1.0E5,
             boundary=inner_boundary)
 
 pinn.set_other_params(P=10)
-pinn.train(2000)
+pinn.train(20)
 u = pinn(plot_nodes).numpy()
 condition1 = tf.norm(plot_nodes, axis=1) > 4
 condition2 = tf.norm(plot_nodes, axis=1) < 1
