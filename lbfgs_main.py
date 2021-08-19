@@ -37,7 +37,7 @@ class Hybrid(PINN_Elastic2D):
         work_done = tf.reduce_mean(tf.reduce_sum(self.P*self.boundary*self(self.boundary), axis=1))*np.pi/2
         return work_done
     
-    def train(self, adam_steps=100, lbfgs=False, lbfgs_steps=50, max_iterations=100, num_correction_pairs=10):
+    def train(self, adam_steps=100, lbfgs=False, max_iterations=100, num_correction_pairs=10, max_line_search_iterations=50):
         
         # Optimisation steps for Adam
         for i in range(adam_steps):
@@ -45,8 +45,9 @@ class Hybrid(PINN_Elastic2D):
                
         # Optimisation steps for lbfgs
         if lbfgs:
+            self.lbfgs_setup()
             lbfgs_func = self.lbfgs_function()
-    
+
             # convert initial model parameters to a 1D tf.Tensor
             init_params = tf.dynamic_stitch(self.idx, self.trainable_weights)
         
@@ -54,6 +55,7 @@ class Hybrid(PINN_Elastic2D):
             results = tfp.optimizer.lbfgs_minimize(value_and_gradients_function=lbfgs_func,
                                                    initial_position=init_params,
                                                    max_iterations=max_iterations,
+                                                   max_line_search_iterations=max_line_search_iterations,
                                                    num_correction_pairs=num_correction_pairs)
         
             # assign back the update parameters
@@ -76,7 +78,8 @@ if __name__=="__main__":
     
     pinn.train(adam_steps=10,
                lbfgs=True,
-               lbfgs_steps=10)
+               max_iterations=11,
+               max_line_search_iterations=50)
     
     u = pinn(plot_nodes).numpy()
     condition1 = tf.norm(plot_nodes, axis=1) > 4
