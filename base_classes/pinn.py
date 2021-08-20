@@ -50,7 +50,7 @@ class PINN_Elastic2D():
     
     def stress(self, x, return_strain=False):
         strain = self.strain(x)
-        stiffness_matrix = self.elasticity()
+        stiffness_matrix = self.elasticity(x)
         stress = tf.matmul(stiffness_matrix, strain, transpose_b=True)
         if return_strain:
             return stress, strain
@@ -102,7 +102,7 @@ class PINN_Elastic2D():
         if not(self.adam_epoch%self.print_freq):
             tf.print('Optimizer: {2} \tEpoch: {0}\tLoss: {1}'.format(self.adam_epoch.numpy(), self.adam_history[-1], "Adam"))
     
-    def elasticity(self):
+    def elasticity(self, x):
         C = tf.convert_to_tensor([[self.E/(1-self.nu**2), self.E*self.nu/(1-self.nu**2), 0],
                                   [self.E*self.nu/(1-self.nu**2),self.E/(1-self.nu**2), 0],
                                   [0, 0, self.E/(2*(1+self.nu))]], dtype=tf.float64)

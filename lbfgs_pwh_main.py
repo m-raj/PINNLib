@@ -72,7 +72,7 @@ if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
     pinn = Hybrid(E=1.0,
             nu=0.3,
-            layer_sizes=[2,50,50,50,2],
+            layer_sizes=[2,100,100,100,2],
             lb = tf.reduce_min(gauss_points, axis=0),
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
@@ -82,7 +82,7 @@ if __name__=="__main__":
 
     pinn.set_other_params(F=1.0)
     
-    pinn.train(adam_steps=2000,
+    pinn.train(adam_steps=500,
                lbfgs=True,
                max_iterations=500,
                max_line_search_iterations=50,
