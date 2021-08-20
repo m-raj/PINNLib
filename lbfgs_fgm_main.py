@@ -5,18 +5,19 @@ from base_classes.pinn import PINN_Elastic2D
 from utils.plot_functions import *
 import sys
 
-# gauss points
-gauss_points = scipy.io.loadmat('mesh/annulus_gauss_pt_wt.mat')['gauss_pt_wt']
-weights = tf.convert_to_tensor(np.prod(gauss_points[:,2:], axis=1), dtype=tf.float64)
-gauss_points = tf.convert_to_tensor(gauss_points[:,:2], dtype=tf.float64)
+# Mesh
+mesh_X, mesh_Y = tf.meshgrid(tf.linspace(0.0,0.5,150), tf.linspace(0.0,1.5,450))
+gauss_points = tf.cast(tf.stack((tf.reshape(mesh_X, (-1,)), tf.reshape(mesh_Y, (-1,))), axis=1), dtype=tf.float64)
+Area = 0.5*1.5
+weights = Area*tf.ones((gauss_points.shape[0],), dtype=tf.float64)/(150*450)
 
 plot_gauss_points(gauss_points, title='Mesh')
 
-# inner boundary
-inner_boundary = tf.stack((tf.cos(np.linspace(0, np.pi/2, 1000)),tf.sin(np.linspace(0, np.pi/2,1000))), axis=1)
+# top boundary
+top_boundary = tf.stack((tf.cast(tf.linspace(0.0, 0.5,1000), dtype=tf.float64), 1.5*tf.ones((1000,), dtype=tf.float64)), axis=1)
 
 # plot nodes
-plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,4,800), tf.linspace(0,4,800))
+plot_X, plot_Y  = tf.meshgrid(tf.linspace(0.0,0.5,1000), tf.linspace(0.0,1.5,1000))
 plot_nodes = tf.cast(tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1), dtype=tf.float64)
 
 class Hybrid(PINN_Elastic2D):
@@ -31,15 +32,30 @@ class Hybrid(PINN_Elastic2D):
         self.training_nodes = training_nodes
         self.boundary = boundary
         
-    def set_other_params(self, P=10):
-        self.P = P
-        
+    def set_other_params(self, F=1.0):
+        self.F = F
+        self.x_axis = tf.constant([[1, 0]], dtype=tf.float64)
+        self.y_axis = tf.constant([[0, 1]], dtype=tf.float64)
+        self.origin = tf.reshape(tf.cast(tf.norm(self.training_nodes)==0, dtype=tf.float64), (-1, 1))
+
+    def dirichlet_bc(self, x, y):
+        x_axis = tf.constant([[1, 0]], dtype=tf.float64)
+        y_axis = tf.constant([[0, 1]], dtype=tf.float64)
+        return (1.0-self.origin)*(y_axis*x*y + x_axis*y) + self.origin*(y*0.0)
+
     def traction_work_done(self, x):
-        work_done = tf.reduce_mean(tf.reduce_sum(self.P*self.boundary*self(self.boundary), axis=1))*np.pi/2
+        work_done = tf.reduce_mean(self.F*self(self.boundary)[:,1])*0.5
         return work_done
     
-    def dirichlet_bc(self, x, y):
-        return x*y
+    def elasticity(self, x):
+        beta = 1.0
+        C = tf.convert_to_tensor([[self.E/(1-self.nu**2), self.E*self.nu/(1-self.nu**2), 0],
+                                  [self.E*self.nu/(1-self.nu**2),self.E/(1-self.nu**2), 0],
+                                  [0, 0, self.E/(2*(1+self.nu))]], dtype=tf.float64)
+        gradation = tf.expand_dims(tf.expand_dims(tf.exp(beta*x[:,1]), 1), 1)
+        C = gradation*C
+        return C
+    
 
     def train(self, adam_steps=100, lbfgs=False, max_iterations=100, num_correction_pairs=10, max_line_search_iterations=50):
         
@@ -68,36 +84,32 @@ class Hybrid(PINN_Elastic2D):
 
 if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
-    pinn = Hybrid(E=1.0E5,
+    pinn = Hybrid(E=1.0,
             nu=0.3,
-            layer_sizes=[2,30,30,30,2],
+            layer_sizes=[2,100,100,100,2],
             lb = tf.reduce_min(gauss_points, axis=0),
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
             weights=weights,
-            activation = tf.nn.relu,
-            boundary=inner_boundary)
+            activation = tf.nn.tanh,
+            boundary=top_boundary)
 
-    pinn.set_other_params(P=10)
+    pinn.set_other_params(F=1.0)
     
     pinn.train(adam_steps=int(sys.argv[1]),
                lbfgs=True,
-               max_iterations=int(sys.argv[1]),
+               max_iterations=int(sys.argv[2]),
                max_line_search_iterations=50,
-               num_correction_pairs=100)
-   
-    plt.figure(figsize=(5,4))
-    plt.plot(range(len(pinn.adam_history)), pinn.adam_history, label='Adam')
-    plt.plot(range(len(pinn.adam_history), len(pinn.adam_history)+len(pinn.lbfgs_history)), pinn.lbfgs_history, label='L-BFGS')
-    ll = min(min(pinn.adam_history), min(pinn.lbfgs_history))
-    ul = max(pinn.adam_history)
-    plt.ylim([-0.002, 0.1])
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig('loss.png')
-    plt.show()
-    u = pinn(plot_nodes).numpy()
-    condition1 = tf.norm(plot_nodes, axis=1) > 4
-    condition2 = tf.norm(plot_nodes, axis=1) < 1
-    plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape, conditions=[condition1, condition2])
-    plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape, conditions=[condition1, condition2])
+               num_correction_pairs=20)
+    
+    u = pinn(gauss_points).numpy()
+    
+    plot_scaler_field(u[:,0], title='ux', shape=mesh_X.shape)
+    plot_scaler_field(u[:,1], title='uy', shape=mesh_X.shape)
+
+    stress = pinn.stress(plot_nodes).numpy()
+    plot_scaler_field(stress[:,0], title='SXX', shape=mesh_X.shape)
+    plot_scaler_field(stress[:,1], title='SYY', shape=mesh_X.shape)
+    plot_scaler_field(stress[:,2], title='SXY', shape=mesh_X.shape)
+
+

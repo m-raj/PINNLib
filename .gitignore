@@ -6,7 +6,7 @@
 *.vts
 *.m~
 *.fig
-
+*.log
 # Ignore file swap
 *.swp
 # Ignore folder idea of pycharm idea

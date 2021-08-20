@@ -3,6 +3,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from base_classes.pinn import PINN_Elastic2D
 from utils.plot_functions import *
+import sys
 
 # gauss points
 gauss_points = scipy.io.loadmat('mesh/plate_with_a_hole_pt_wt.mat')['Gauss_pt_wt']
@@ -19,7 +20,7 @@ r = 0.1
 
 # plot nodes
 plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,1,1000), tf.linspace(0,1,1000))
-plot_nodes = tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1)
+plot_nodes = tf.cast(tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1), dtype=tf.float64)
 
 class Hybrid(PINN_Elastic2D):
     def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary):
@@ -82,9 +83,9 @@ if __name__=="__main__":
 
     pinn.set_other_params(F=1.0)
     
-    pinn.train(adam_steps=500,
+    pinn.train(adam_steps=int(sys.argv[1]),
                lbfgs=True,
-               max_iterations=500,
+               max_iterations=int(sys.argv[2]),
                max_line_search_iterations=50,
                num_correction_pairs=20)
     
