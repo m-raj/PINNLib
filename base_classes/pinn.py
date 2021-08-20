@@ -10,7 +10,7 @@ class PINN_Elastic2D():
         self.E = tf.constant(E, dtype=tf.float64)
         self.nu= tf.constant(nu, dtype=tf.float64)
         self.weights = weights
-        self.optimizer = tf.keras.optimizers.Adam()
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=1E-2)
         self.adam_epoch = tf.Variable(0, dtype=tf.int32)
         self.adam_history = []
         self.layer_sizes = layer_sizes
@@ -31,7 +31,7 @@ class PINN_Elastic2D():
         return self.dirichlet_bc(x, y)
     
     def dirichlet_bc(self, x, y):
-        return x*y
+        pass
     
     def strain_matrix(self, x):
         with tf.GradientTape() as tape:
@@ -57,7 +57,8 @@ class PINN_Elastic2D():
         return stress
         
     def traction_work_done(self):
-        pass 
+        # Return total work done by the external traction forces
+        return 0.0
     
     def set_other_params(self):
         pass
@@ -66,7 +67,7 @@ class PINN_Elastic2D():
         in_dim = size[0]
         out_dim = size[1]
         xavier_stddev = np.sqrt(2.0 / (in_dim + out_dim))
-        return tf.Variable(tf.random.truncated_normal([in_dim, out_dim], stddev=xavier_stddev, dtype=tf.float64), dtype=tf.float64, trainable=True)
+        return tf.Variable(tf.random.truncated_normal([in_dim, out_dim], stddev=xavier_stddev, dtype=tf.float64, seed=1), dtype=tf.float64, trainable=True)
     
     def strain_energy(self, x, return_strain=False, return_stress=False):
         stress, strain = self.stress(x, return_strain=True)
@@ -121,7 +122,7 @@ class PINN_Elastic2D():
         self.n_tensors = len(self.shapes)
         self.idx = []
         self.lbfgs_iter = tf.Variable(0)
-        self.history = []
+        self.lbfgs_history = []
         
         for i, shape in enumerate(self.shapes):
             n = np.product(shape)
@@ -146,7 +147,7 @@ class PINN_Elastic2D():
         self.lbfgs_iter.assign_add(1)
         if not(self.lbfgs_iter%self.print_freq):
             tf.print("Optimizer: {2}\tIter: {0}\tLoss: {1}\tAdam epochs:{3}".format(self.lbfgs_iter.numpy(), loss_value, "LBFGS", self.adam_epoch.numpy()))
-        tf.py_function(self.history.append, inp=[loss_value], Tout=[])
+        tf.py_function(self.lbfgs_history.append, inp=[loss_value], Tout=[])
         
         return loss_value, grads
 

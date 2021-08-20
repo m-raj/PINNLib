@@ -5,17 +5,20 @@ from base_classes.pinn import PINN_Elastic2D
 from utils.plot_functions import *
 
 # gauss points
-gauss_points = scipy.io.loadmat('mesh/annulus_gauss_pt_wt.mat')['gauss_pt_wt']
+gauss_points = scipy.io.loadmat('mesh/plate_with_a_hole_pt_wt.mat')['Gauss_pt_wt']
 weights = tf.convert_to_tensor(np.prod(gauss_points[:,2:], axis=1), dtype=tf.float64)
 gauss_points = tf.convert_to_tensor(gauss_points[:,:2], dtype=tf.float64)
 
 plot_gauss_points(gauss_points, title='Mesh')
 
-# inner boundary
-inner_boundary = tf.stack((tf.cos(np.linspace(0, np.pi/2, 1000)),tf.sin(np.linspace(0, np.pi/2,1000))), axis=1)
+# right boundary
+right_boundary = tf.stack((tf.ones((1000,), dtype=tf.float64),tf.cast(tf.linspace(0.0, 1.0,1000), dtype=tf.float64)), axis=1)
+
+# Hole radius
+r = 0.1
 
 # plot nodes
-plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,4,800), tf.linspace(0,4,800))
+plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,1,1000), tf.linspace(0,1,1000))
 plot_nodes = tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1)
 
 class Hybrid(PINN_Elastic2D):
@@ -30,11 +33,14 @@ class Hybrid(PINN_Elastic2D):
         self.training_nodes = training_nodes
         self.boundary = boundary
         
-    def set_other_params(self, P=10):
-        self.P = P
-        
+    def set_other_params(self, F=1.0):
+        self.F = F
+       
+    def dirichlet_bc(self, x, y):
+        return x*y
+
     def traction_work_done(self, x):
-        work_done = tf.reduce_mean(tf.reduce_sum(self.P*self.boundary*self(self.boundary), axis=1))*np.pi/2
+        work_done = self.F*tf.reduce_mean(self(self.boundary)[:,0])
         return work_done
     
     def train(self, adam_steps=100, lbfgs=False, max_iterations=100, num_correction_pairs=10, max_line_search_iterations=50):
@@ -64,25 +70,32 @@ class Hybrid(PINN_Elastic2D):
 
 if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
-    pinn = Hybrid(E=1.0E5,
+    pinn = Hybrid(E=1.0,
             nu=0.3,
-            layer_sizes=[2,30,30,30,2],
+            layer_sizes=[2,50,50,50,2],
             lb = tf.reduce_min(gauss_points, axis=0),
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
             weights=weights,
-            activation = tf.nn.relu,
-            boundary=inner_boundary)
+            activation = tf.nn.tanh,
+            boundary=right_boundary)
 
-    pinn.set_other_params(P=10)
+    pinn.set_other_params(F=1.0)
     
-    pinn.train(adam_steps=10,
+    pinn.train(adam_steps=2000,
                lbfgs=True,
-               max_iterations=11,
-               max_line_search_iterations=50)
+               max_iterations=500,
+               max_line_search_iterations=50,
+               num_correction_pairs=20)
     
     u = pinn(plot_nodes).numpy()
-    condition1 = tf.norm(plot_nodes, axis=1) > 4
-    condition2 = tf.norm(plot_nodes, axis=1) < 1
-    plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape, conditions=[condition1, condition2])
-    plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape, conditions=[condition1, condition2])
+    condition1 = tf.norm(plot_nodes, axis=1) < r
+    plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape, conditions=[condition1])
+    plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape, conditions=[condition1])
+
+    stress = pinn.stress(plot_nodes).numpy()
+    plot_scaler_field(stress[:,0], title='SXX', shape=plot_X.shape, conditions=[condition1])
+    plot_scaler_field(stress[:,1], title='SYY', shape=plot_X.shape, conditions=[condition1])
+    plot_scaler_field(stress[:,2], title='SXY', shape=plot_X.shape, conditions=[condition1])
+
+
