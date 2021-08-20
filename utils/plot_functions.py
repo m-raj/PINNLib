@@ -27,10 +27,11 @@ def plot_scaler_field_on_gauss_points(gauss_points, field, title, cmap='jet'):
 def plot_scaler_field(field, shape, title, conditions = []):
     for condition in conditions:
         field[condition] = np.nan
-    field = field.rehsape(shape)
+    field = field.reshape(shape)
     plt.rcParams.update({'font.family':'serif',
                          'font.sans-serif':'Times New Roman',
                          'font.size':12})
+    plt.figure(figsize=(5,4))
     plt.imshow(field, cmap='jet', origin='lower')
     plt.colorbar()
     plt.title(title)
