@@ -23,14 +23,15 @@ plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,1,1000), tf.linspace(0,1,1000))
 plot_nodes = tf.cast(tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1), dtype=tf.float64)
 
 class Hybrid(PINN_Elastic2D):
-    def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary):
+    def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary, debug):
         super().__init__(E,
                          nu,
                          layer_sizes,
                          lb,
                          ub,
                          weights,
-                         activation)
+                         activation,
+                         debug=debug)
         self.training_nodes = training_nodes
         self.boundary = boundary
         
@@ -79,7 +80,8 @@ if __name__=="__main__":
             training_nodes=gauss_points,
             weights=weights,
             activation = tf.nn.tanh,
-            boundary=right_boundary)
+            boundary=right_boundary, 
+            debug=True)
 
     pinn.set_other_params(F=1.0)
     
@@ -88,7 +90,13 @@ if __name__=="__main__":
                max_iterations=int(sys.argv[2]),
                max_line_search_iterations=50,
                num_correction_pairs=20)
-    
+    mean, std = pinn.debug_result_out() 
+    fig, ax = plt.subplots(sharex=True, ncols=1, nrows=mean.shape[1])
+    for i in range(mean.shape[1]):
+        ax[i].errorbar(range(mean.shape[0]), mean[:,i], yerr=std[:,i]/2, label='Layer {0}'.format(i+1), elinewidth=0.1, c=tf.random.uniform(shape=(3,)).numpy())
+        ax[i].legend()
+    plt.savefig('errorbar')
+    plt.show()
     u = pinn(plot_nodes).numpy()
     condition1 = tf.norm(plot_nodes, axis=1) < r
     plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape, conditions=[condition1])

@@ -6,7 +6,7 @@ tf.keras.backend.set_floatx('float64')
 
 
 class PINN_Elastic2D():
-    def __init__(self, E, nu, layer_sizes, lb, ub, weights, activation, print_freq=10):
+    def __init__(self, E, nu, layer_sizes, lb, ub, weights, activation, print_freq=10, debug=False):
         self.E = tf.constant(E, dtype=tf.float64)
         self.nu= tf.constant(nu, dtype=tf.float64)
         self.weights = weights
@@ -16,18 +16,29 @@ class PINN_Elastic2D():
         self.layer_sizes = layer_sizes
         self.lb = lb
         self.ub = ub
+        self.debug_mean = []
+        self.debug_std = []
         self.trainable_weights = []
         self.activation = activation
         self.print_freq = print_freq
+        self.debug = debug
+        self.call_counter = tf.Variable(0, dtype=tf.int32)
         for i in range(len(layer_sizes)-1):
             self.trainable_weights.append(self.xavier_init(size=[layer_sizes[i], layer_sizes[i + 1]]))
             self.trainable_weights.append(tf.Variable(tf.zeros(shape=layer_sizes[i+1], dtype= tf.float64), trainable=True))  
         
-    def __call__(self, x):
+    def __call__(self, x, debug=False):
         y = self.preprocess(x)
         for i in range(0, len(self.trainable_weights)-2, 2):
             y = self.activation(tf.matmul(y, self.trainable_weights[i]) + self.trainable_weights[i+1])**2
+            if debug:
+                self.debug_mean.append(tf.reduce_mean(y))
+                self.debug_std.append(tf.math.reduce_std(y))
         y = tf.matmul(y, self.trainable_weights[-2]) + self.trainable_weights[-1]
+        if debug:
+            self.debug_mean.append(tf.reduce_mean(y))
+            self.debug_std.append(tf.math.reduce_std(y))
+            self.call_counter.assign_add(1)
         return self.dirichlet_bc(x, y)
     
     def dirichlet_bc(self, x, y):
@@ -36,7 +47,7 @@ class PINN_Elastic2D():
     def strain_matrix(self, x):
         with tf.GradientTape() as tape:
             tape.watch(x)
-            u = self(x)
+            u = self(x, self.debug)
         strain = tf.reshape(tape.batch_jacobian(u, x), (x.shape[0], 4))
         return strain
     
@@ -112,6 +123,11 @@ class PINN_Elastic2D():
         y = 2.0*(x-self.lb)/(self.ub-self.lb) - 1.0
         return y
     
+    ############## Return Debug Result ###########
+    def debug_result_out(self):
+        mean = tf.reshape(tf.convert_to_tensor(self.debug_mean), (self.call_counter, len(self.layer_sizes)-1))
+        std = tf.reshape(tf.convert_to_tensor(self.debug_std), (self.call_counter, len(self.layer_sizes)-1))
+        return mean, std
     ############## LBFGS Optimizer ###############
     
     def lbfgs_setup(self):
