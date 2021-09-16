@@ -75,7 +75,7 @@ if __name__=="__main__":
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
             weights=weights,
-            activation = tf.nn.relu,
+            activation = tf.nn.tanh,
             boundary=inner_boundary)
 
     pinn.set_other_params(P=10)
