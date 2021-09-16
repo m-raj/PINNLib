@@ -90,42 +90,15 @@ if __name__=="__main__":
                max_iterations=int(sys.argv[2]),
                max_line_search_iterations=50,
                num_correction_pairs=20)
+    
     mean, std = pinn.debug_result_out() 
-    fig, ax = plt.subplots(sharex=True, ncols=1, nrows=mean.shape[1])
-    for i in range(mean.shape[1]):
-        ax[i].errorbar(range(mean.shape[0]), mean[:,i], yerr=std[:,i]/2, label='Layer {0}'.format(i+1), elinewidth=0.1, c=tf.random.uniform(shape=(3,)).numpy())
-        ax[i].legend(loc='upper left', fontsize=8)
-    ax[0].set_title('Distribution of activation values')
-    plt.tight_layout()
-    plt.savefig('activation_distribution')
-    plt.show()
+    debug_activations(mean, std)   
     
     mean, std = pinn.debug_weight_result_out() 
-    fig, ax = plt.subplots(sharex=True, ncols=2, nrows=mean.shape[1]//2)
-    for i in range(0,mean.shape[1],2):
-        ax[i//2, 0].errorbar(range(mean.shape[0]), mean[:,i], yerr=std[:,i]/2, label='Layer {0}'.format(i//2+1), elinewidth=0.1, c=tf.random.uniform(shape=(3,)).numpy())
-        ax[i//2, 1].errorbar(range(mean.shape[0]), mean[:,i+1], yerr=std[:,i+1]/2, label='Layer {0}'.format(i//2+1), elinewidth=0.1, c=tf.random.uniform(shape=(3,)).numpy())
-        ax[i//2, 0].legend(loc='upper left', fontsize=8)
-        ax[i//2, 1].legend(loc='upper left', fontsize=8)
-    ax[0,0].set_title('Distribution of weights', fontsize=8)
-    ax[0,1].set_title('Distribution of bias', fontsize=8)
-    plt.tight_layout()
-    plt.savefig('weight_distribution')
-    plt.show()
-    
-    mean, std = pinn.debug_grad_result_out() 
-    fig, ax = plt.subplots(sharex=True, ncols=2, nrows=mean.shape[1]//2)
-    for i in range(0,mean.shape[1],2):
-        ax[i//2, 0].errorbar(range(mean.shape[0]), mean[:,i], yerr=std[:,i]/2, label='Layer {0}'.format(i//2+1), elinewidth=0.1, c=tf.random.uniform(shape=(3,)).numpy())
-        ax[i//2, 1].errorbar(range(mean.shape[0]), mean[:,i+1], yerr=std[:,i+1]/2, label='Layer {0}'.format(i//2+1), elinewidth=0.1, c=tf.random.uniform(shape=(3,)).numpy())
-        ax[i//2, 0].legend(loc='upper left', fontsize=8)
-        ax[i//2, 1].legend(loc='upper left', fontsize=8)
-    ax[0,0].set_title('Weight gradients', fontsize=8)
-    ax[0,1].set_title('Bias gradients', fontsize=8)
-    plt.tight_layout()
-    plt.savefig('gradient_distribution')
-    plt.show()
+    debug_weights(mean, std)
 
+    mean, std = pinn.debug_grad_result_out() 
+    debug_gradients(mean, std)
 
     u = pinn(plot_nodes).numpy()
     condition1 = tf.norm(plot_nodes, axis=1) < r

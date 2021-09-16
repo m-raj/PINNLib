@@ -34,7 +34,7 @@ class PINN_Elastic2D():
     def __call__(self, x, debug=False):
         y = self.preprocess(x)
         for i in range(0, len(self.trainable_weights)-2, 2):
-            y = self.activation(tf.matmul(y, self.trainable_weights[i]) + self.trainable_weights[i+1])**3
+            y = self.activation(tf.matmul(y, self.trainable_weights[i]) + self.trainable_weights[i+1])**2
             if debug:
                 self.debug_mean.append(tf.reduce_mean(y))
                 self.debug_std.append(tf.math.reduce_std(y))

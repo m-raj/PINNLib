@@ -86,16 +86,15 @@ if __name__=="__main__":
                max_line_search_iterations=50,
                num_correction_pairs=100)
    
-    plt.figure(figsize=(5,4))
-    plt.plot(range(len(pinn.adam_history)), pinn.adam_history, label='Adam')
-    plt.plot(range(len(pinn.adam_history), len(pinn.adam_history)+len(pinn.lbfgs_history)), pinn.lbfgs_history, label='L-BFGS')
-    ll = min(min(pinn.adam_history), min(pinn.lbfgs_history))
-    ul = max(pinn.adam_history)
-    plt.ylim([-0.002, 0.1])
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig('loss.png')
-    plt.show()
+    mean, std = pinn.debug_result_out() 
+    debug_activations(mean, std)   
+    
+    mean, std = pinn.debug_weight_result_out() 
+    debug_weights(mean, std)
+
+    mean, std = pinn.debug_grad_result_out() 
+    debug_gradients(mean, std)
+
     u = pinn(plot_nodes).numpy()
     condition1 = tf.norm(plot_nodes, axis=1) > 4
     condition2 = tf.norm(plot_nodes, axis=1) < 1
