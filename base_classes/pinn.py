@@ -16,8 +16,12 @@ class PINN_Elastic2D():
         self.layer_sizes = layer_sizes
         self.lb = lb
         self.ub = ub
+        self.debug_weights_mean = []
+        self.debug_weights_std = []
         self.debug_mean = []
         self.debug_std = []
+        self.debug_grads_mean = []
+        self.debug_grads_std = []
         self.trainable_weights = []
         self.activation = activation
         self.print_freq = print_freq
@@ -30,14 +34,25 @@ class PINN_Elastic2D():
     def __call__(self, x, debug=False):
         y = self.preprocess(x)
         for i in range(0, len(self.trainable_weights)-2, 2):
-            y = self.activation(tf.matmul(y, self.trainable_weights[i]) + self.trainable_weights[i+1])**2
+            y = self.activation(tf.matmul(y, self.trainable_weights[i]) + self.trainable_weights[i+1])**3
             if debug:
                 self.debug_mean.append(tf.reduce_mean(y))
                 self.debug_std.append(tf.math.reduce_std(y))
+                self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i]))
+                self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i+1]))
+                self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i]))
+                self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i+1]))
+
         y = tf.matmul(y, self.trainable_weights[-2]) + self.trainable_weights[-1]
         if debug:
             self.debug_mean.append(tf.reduce_mean(y))
             self.debug_std.append(tf.math.reduce_std(y))
+            self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i]))
+            self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i+1]))
+            self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i]))
+            self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i+1]))
+
+
             self.call_counter.assign_add(1)
         return self.dirichlet_bc(x, y)
     
@@ -105,7 +120,11 @@ class PINN_Elastic2D():
     def train_step(self, x):
         with tf.GradientTape() as tape:
             loss = self.compute_loss(x)
-        self.optimizer.minimize(loss, self.trainable_weights, tape=tape) 
+        grads = tape.gradient(loss, self.trainable_weights)
+        for ele in grads:
+            self.debug_grads_mean.append(tf.reduce_mean(ele))
+            self.debug_grads_std.append(tf.math.reduce_std(ele))
+        self.optimizer.apply_gradients(zip(grads, self.trainable_weights)) 
         
         # Callbacks
         self.adam_epoch.assign_add(1)
@@ -128,6 +147,18 @@ class PINN_Elastic2D():
         mean = tf.reshape(tf.convert_to_tensor(self.debug_mean), (self.call_counter, len(self.layer_sizes)-1))
         std = tf.reshape(tf.convert_to_tensor(self.debug_std), (self.call_counter, len(self.layer_sizes)-1))
         return mean, std
+
+    def debug_weight_result_out(self):
+        mean = tf.reshape(tf.convert_to_tensor(self.debug_weights_mean), (self.call_counter, len(self.trainable_weights)))
+        std = tf.reshape(tf.convert_to_tensor(self.debug_weights_std), (self.call_counter, len(self.trainable_weights)))
+        return mean, std
+    
+    def debug_grad_result_out(self):
+        mean = tf.reshape(tf.convert_to_tensor(self.debug_grads_mean), (self.call_counter-1, len(self.trainable_weights)))
+        std = tf.reshape(tf.convert_to_tensor(self.debug_grads_std), (self.call_counter-1, len(self.trainable_weights)))
+        return mean, std
+
+
     ############## LBFGS Optimizer ###############
     
     def lbfgs_setup(self):
