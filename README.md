@@ -42,12 +42,23 @@ The procedure for numerically solving the given diffrential equation using physi
  
     1. Set the functional of the differential equation as the loss of the neural network.
   
- **Training the neural network**
- 
  <p align="center">
   <img width=500mm src="images/pinn_1d.png">
 </p>
-1. Solves differential equations
-2. Neural network with unsupervised learning
-3. Uses the knowledge of underlying physic
-4. Exploits auto-differentiation technique to calcuate loss of the neural network model
+
+**Training the neural network**
+
+    1. Initialize the neural network
+    2. Predict **u** in forward pass
+    3. Compute loss
+    4. Backpropagation
+
+**Physics informed loss:**
+
+The loss corresponding to the given differential equation is basically it's functional. In the context of mechanics, the loss is the strain energy stored in the system. Hence, the neural network attempts at minimising the strain energy. 
+
+Mathematically, the loss is defined as:
+
+<p align="center">
+  <img src="https://render.githubusercontent.com/render/math?math=\sum_{i}^N%20\dfrac{1}{2(x_i+%2B%201)}\left(%20\left.\dfrac{\partial%20u}{\partial%20x}\right\rvert_{x_{i}}\right)%20^2">
+</p>
