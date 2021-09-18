@@ -37,9 +37,9 @@ class Hybrid(PINN_Elastic2D):
         self.F = F       
         self.x_axis = tf.constant([[1, 0]], dtype=tf.float64)
         self.y_axis = tf.constant([[0, 1]], dtype=tf.float64)
-        self.origin = tf.reshape(tf.cast(tf.norm(self.training_nodes)==0, dtype=tf.float64), (-1, 1))
-        
+               
     def dirichlet_bc(self, x, y):
+        self.origin = tf.reshape(tf.cast(tf.norm(x, axis=1)==0, dtype=tf.float64), (-1, 1))
         return (1.0-self.origin)*(self.y_axis*x*y + self.x_axis*y) + self.origin*(y*0.0)
 
     def traction_work_done(self, x):
@@ -111,14 +111,13 @@ if __name__=="__main__":
     mean, std = pinn.debug_grad_result_out() 
     debug_gradients(mean, std)
 
-    u = pinn(gauss_points).numpy()
-    
-    plot_scaler_field(u[:,0], title='ux', shape=mesh_X.shape)
-    plot_scaler_field(u[:,1], title='uy', shape=mesh_X.shape)
+    u = pinn(plot_nodes).numpy() 
+    plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape)
+    plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape)
 
     stress = pinn.stress(plot_nodes).numpy()
-    plot_scaler_field(stress[:,0], title='SXX', shape=mesh_X.shape)
-    plot_scaler_field(stress[:,1], title='SYY', shape=mesh_X.shape)
-    plot_scaler_field(stress[:,2], title='SXY', shape=mesh_X.shape)
+    plot_scaler_field(stress[:,0], title='SXX', shape=plot_X.shape)
+    plot_scaler_field(stress[:,1], title='SYY', shape=plot_X.shape)
+    plot_scaler_field(stress[:,2], title='SXY', shape=plot_X.shape)
 
 
