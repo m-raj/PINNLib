@@ -21,34 +21,33 @@ plot_X, plot_Y  = tf.meshgrid(tf.linspace(0.0,0.5,1000), tf.linspace(0.0,1.5,100
 plot_nodes = tf.cast(tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1), dtype=tf.float64)
 
 class Hybrid(PINN_Elastic2D):
-    def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary):
+    def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary, debug):
         super().__init__(E,
                          nu,
                          layer_sizes,
                          lb,
                          ub,
                          weights,
-                         activation)
+                         activation,
+                         debug=debug)
         self.training_nodes = training_nodes
         self.boundary = boundary
         
     def set_other_params(self, F=1.0):
-        self.F = F
+        self.F = F       
         self.x_axis = tf.constant([[1, 0]], dtype=tf.float64)
         self.y_axis = tf.constant([[0, 1]], dtype=tf.float64)
         self.origin = tf.reshape(tf.cast(tf.norm(self.training_nodes)==0, dtype=tf.float64), (-1, 1))
-
+        
     def dirichlet_bc(self, x, y):
-        x_axis = tf.constant([[1, 0]], dtype=tf.float64)
-        y_axis = tf.constant([[0, 1]], dtype=tf.float64)
-        return (1.0-self.origin)*(y_axis*x*y + x_axis*y) + self.origin*(y*0.0)
+        return (1.0-self.origin)*(self.y_axis*x*y + self.x_axis*y) + self.origin*(y*0.0)
 
     def traction_work_done(self, x):
         work_done = tf.reduce_mean(self.F*self(self.boundary)[:,1])*0.5
         return work_done
     
     def elasticity(self, x):
-        beta = 1.0
+        beta = 10.0
         C = tf.convert_to_tensor([[self.E/(1-self.nu**2), self.E*self.nu/(1-self.nu**2), 0],
                                   [self.E*self.nu/(1-self.nu**2),self.E/(1-self.nu**2), 0],
                                   [0, 0, self.E/(2*(1+self.nu))]], dtype=tf.float64)
@@ -92,7 +91,8 @@ if __name__=="__main__":
             training_nodes=gauss_points,
             weights=weights,
             activation = tf.nn.tanh,
-            boundary=top_boundary)
+            boundary=top_boundary,
+            debug=True)
 
     pinn.set_other_params(F=1.0)
     
@@ -101,7 +101,16 @@ if __name__=="__main__":
                max_iterations=int(sys.argv[2]),
                max_line_search_iterations=50,
                num_correction_pairs=20)
+   
+    mean, std = pinn.debug_result_out() 
+    debug_activations(mean, std)   
     
+    mean, std = pinn.debug_weight_result_out() 
+    debug_weights(mean, std)
+
+    mean, std = pinn.debug_grad_result_out() 
+    debug_gradients(mean, std)
+
     u = pinn(gauss_points).numpy()
     
     plot_scaler_field(u[:,0], title='ux', shape=mesh_X.shape)

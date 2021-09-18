@@ -20,14 +20,15 @@ plot_X, plot_Y  = tf.meshgrid(tf.linspace(0,4,800), tf.linspace(0,4,800))
 plot_nodes = tf.cast(tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1), dtype=tf.float64)
 
 class Hybrid(PINN_Elastic2D):
-    def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary):
+    def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary, debug):
         super().__init__(E,
                          nu,
                          layer_sizes,
                          lb,
                          ub,
                          weights,
-                         activation)
+                         activation,
+                         debug=debug)
         self.training_nodes = training_nodes
         self.boundary = boundary
         
@@ -70,19 +71,20 @@ if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
     pinn = Hybrid(E=1.0E5,
             nu=0.3,
-            layer_sizes=[2,30,30,30,2],
+            layer_sizes=[2,50,50, 50, 2],
             lb = tf.reduce_min(gauss_points, axis=0),
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
             weights=weights,
-            activation = tf.nn.relu,
-            boundary=inner_boundary)
+            activation = tf.nn.tanh,
+            boundary=inner_boundary,
+            debug=True)
 
     pinn.set_other_params(P=10)
     
     pinn.train(adam_steps=int(sys.argv[1]),
                lbfgs=True,
-               max_iterations=int(sys.argv[1]),
+               max_iterations=int(sys.argv[2]),
                max_line_search_iterations=50,
                num_correction_pairs=100)
    
