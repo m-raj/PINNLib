@@ -13,5 +13,4 @@
 .idea/
 # Ignore file python compiled code
 *.pyc
-*.png
 *.pdf
