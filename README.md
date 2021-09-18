@@ -43,6 +43,10 @@ The procedure for numerically solving the given diffrential equation using physi
     1. Set the functional of the differential equation as the loss of the neural network.
   
  **Training the neural network**
+ 
+ <p align="center">
+  <img width=500mm src="images/pinn_1d.png">
+</p>
 1. Solves differential equations
 2. Neural network with unsupervised learning
 3. Uses the knowledge of underlying physic
