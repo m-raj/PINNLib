@@ -9,9 +9,40 @@ Diffrential equations lie at the core of engineering. Irrespective of the engine
 The prefix "Physics Informed" comes from the fact that the loss used to train the neural network is obtained using physics of the diffrential equation being solved. The model is said to be trained using unsupervised learning as there is no target variable to compute the loss, rather the loss is the function of the output inputs and outputs of the neural network model itself. Let's try to understand this approach using a standard problem from the domain of mechanics.
 
 **Formulation of Physics Informed Neural Network:**
-Let's demonstrate how this method can be used to solve 1-D elasticity problems
-Problem setup: Let us assume a 1D bar of length 1 unit spanning from $x=0$ to $x=1$. Let us assume that the elastic modulus of the bar varies with $x$ such that $E(x) = \dfrac{1}{1+x}$. Moreover, let's assume that the area of cross-section of the bar is 1 unit. The boundary conditions are such that the left end of the bar is fixed at $x=0$ while a displacement boundary condition is applied to the right end such that $u_x(1)$ is one.
+Let's solve the following diffrential equation under the given boundary condition using physics informed neural network:
+<p align="center">
+  <img src="https://render.githubusercontent.com/render/math?math=\dfrac{\partial}{\partial x}\left( \dfrac{1}{1 %2B x} \dfrac{\partial u}{\partial x}\right) = 0">
+ </p>
+such that
+<p align="center">
+  <img src="https://render.githubusercontent.com/render/math?math=u(x=0) =0, u(x=1) = 1">
+</p>
 
+The analytical solution to the above equation can easily be derived and turns out to be the following:
+<p align="center">
+  <img src="https://render.githubusercontent.com/render/math?math=u(x) = \dfrac{x^2%2B2x}{3}">
+</p>
+
+The procedure for numerically solving the given diffrential equation using physics informed neural network is as follows:
+
+**Preparation of the dataset**
+
+    1. Identify the domain on which the diffrential equation is to be solved.
+    2. Discretize the domain into a set of nodes
+    3. Compute the weights corresponding to the nodes for carrying out numerical integration.
+
+**Initialization of neural network**
+
+    1. Decide the neural network architecture. Since the domain is one-dimensional, there is only one node in the input layer.
+    2. Since the output is a scaler quantity, the number of nodes in the output layer is 1.
+    3. Decide the number of hidden layers, corresponding number of nodes, activation values etc.
+    4. Possibly design the architecture in such a way that boundary conditions are implicitly satisfied.
+    
+ **Defination of loss for training the neural network**
+ 
+    1. Set the functional of the differential equation as the loss of the neural network.
+  
+ **Training the neural network**
 1. Solves differential equations
 2. Neural network with unsupervised learning
 3. Uses the knowledge of underlying physic
