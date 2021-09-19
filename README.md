@@ -1,4 +1,6 @@
 # Physics Informed Neural Network (PINN)
+_Authors: Mayank Raj, Pramod Kumbhar, Ratna Kumar Annabattula_
+
 **Backgroud:**
 
 The term "neural network" encompasses a wide range of machine learing models with one similarity i.e., so called "neurons" as the basic building block. The variety in the family of neural network models can be in the form of their architecture (arrangement of neurons and layers), learning process (supervised or unsupervised), purpose of the model (regression or classification) and so on. Physics informed neural network is yet another variant in this family of neural networks. Currently in its infancy, PINN can potentially disrupt the way differential equations are presently solved in the field of engineering.
