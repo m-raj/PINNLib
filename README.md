@@ -55,23 +55,27 @@ While the PINN framework offers a lot of flexibility in deciding the model archi
 </p>
 In the context of solid mechanics, the loss above is the internal strain energy of the system. As it is evident, the loss involves computing the strain i.e. the derivative of u w.r.t x. Since, the neural network is basically a parametric function, it is possible to compute the derivate of the target variable u w.r.t. the input variable x in terms of the parameters of the neural network. While computing such derivatives can be a tedious task given the complexity of the parametric neural network, the tensorflow library turns out to be the saviour. The derivative can be easily computed using the technique called "automatic differention" which is implemented in the tensorflow library. While we do not go into the details of automatic differention, we provide a brief in the next section.
 
+
 **Automatic diffrentiation:**
 Automatic diffrentiation is at core of any deep learning library such as tensorflow or pyTorch. In order to understand automatic diffrentiation, let's take a step back to reflect on how neural networks (or any such parametric function) is built in tensorflow. To build a neural network, one uses the so called building block parametric operators in tensorflow. Examples of a such operators are nothing but matrix multiplication,  addition and an activation function. It is to be noted that the gradient to all such operators is already defined in tensorflow. Let's look at the matrix mulplication operator for example. Let us say there is a matrix multiplication operator \phi_M(), which when applied on x, it returns the matrix multiplication result Wx (assuming compatible size of W and x). Hence, whenever one needs to compute the derivative of this operation, the result is the matrix W. 
 
 In a nutshell, the parametric PINN model is built of such fundamental operators whose derivtive is well defined in terms of parameters. Hence, when one needs to compute the derivative, one just needs to multply the derivatives of the fundamental operations in a logical way.
 
-**Training the PINN**
+**Training the PINN:**
 Now that we have understood the building fundamentals of building a PINN, let's us look at the complete pipeline and steps involved in training the model:
 
     1. Create the dataset
     2. Decide the PINN architecture
     3. Initialize the PINN model by setting up random values to the parameters (weights and biases)
-    2. Predict **u** in forward pass
-    3. Compute loss
-    4. Backpropagation
-
-**Physics informed loss:**
-
-The loss corresponding to the given differential equation is basically it's functional. In the context of mechanics, the loss is the strain energy stored in the system. Hence, the neural network attempts at minimising the strain energy. 
-
-Mathematically, the loss is defined as:
+    4. Iterate to train the PINN
+      a. Compute the target variable at nodal coordinates in the forward pass of PINN
+      b. Compute required gradients of the target variable/s w.r.t input variable/s
+      c. Compute loss 
+      d. Update parameters (weights and biases) of PINN
+    5. Predict final solution at the nodal coordinates using the trained PINN model
+    
+ **Results:**
+Following the steps described before, the given 1D differential equation is solved. The comparision between the PINN solution and analytical solution is shown in the figure below. 
+<p align="center">
+  <img width=500mm src="images/pinn_1d_fgm_dirchlet.png">
+</p>
