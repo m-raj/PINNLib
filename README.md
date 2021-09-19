@@ -77,5 +77,5 @@ Now that we have understood the building fundamentals of building a PINN, let's 
  **Results:**
 Following the steps described before, the given 1D differential equation is solved. The comparision between the PINN solution and analytical solution is shown in the figure below. 
 <p align="center">
-  <img width=500mm src="images/pinn_1d_fgm_dirchlet.png">
+  <img width=500mm src="images/pinn_1d_dirchlet_fgm.png">
 </p>
