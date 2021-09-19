@@ -6,9 +6,12 @@ tf.keras.backend.set_floatx('float64')
 
 
 class PINN_Elastic2D():
-    def __init__(self, E, nu, layer_sizes, lb, ub, weights, activation, print_freq=10, debug=False):
-        self.E = tf.constant(E, dtype=tf.float64)
-        self.nu= tf.constant(nu, dtype=tf.float64)
+    def __init__(self, system_properties, layer_sizes, lb, ub, weights, activation, print_freq=10, debug=False):
+        self.E = tf.constant(system_properties['E'], dtype=tf.float64)
+        self.K = tf.constant(system_properties['K'], dtype=tf.float64)
+        self.nu = tf.constant(system_properties['nu'], dtype=tf.float64)
+        self.T0 = tf.constant(system_properties['T0'], dtype=tf.float64)
+        self.alpha = tf.constant(system_properties['alpha'], dtype=tf.float64)
         self.weights = weights
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=1.0E-2)
         self.adam_epoch = tf.Variable(0, dtype=tf.int32)
@@ -51,36 +54,36 @@ class PINN_Elastic2D():
             self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i+1]))
             self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i]))
             self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i+1]))
-
-
             self.call_counter.assign_add(1)
-        return self.dirichlet_bc(x, y)
+        return y#self.dirichlet_bc(x, y)
     
     def dirichlet_bc(self, x, y):
         pass
     
     def strain_matrix(self, x):
-        with tf.GradientTape() as tape:
+        with tf.GradientTape(persistent=True) as tape:
             tape.watch(x)
-            u = self(x, self.debug)
-        strain = tf.reshape(tape.batch_jacobian(u, x), (x.shape[0], 4))
-        return strain
+            u, T = tf.split(self(x, self.debug), [2, 1], axis=1)
+        strain = tape.batch_jacobian(u, x) - self.alpha*tf.expand_dims((T-self.T0), -1)*tf.eye(2, batch_shape=[x.shape[0]], dtype=tf.float64)
+        thermal_gradient = tape.gradient(T, x)
+        strain = tf.reshape(strain, (x.shape[0], 4))
+        return strain, thermal_gradient
     
     def strain(self, x):
-        strain = self.strain_matrix(x)
+        strain, thermal_gradient = self.strain_matrix(x)
         exx = strain[:,0]
         eyy = strain[:,3]
         exy = (strain[:,1] + strain[:,2])
         strain = tf.expand_dims(tf.stack([exx, eyy, exy], axis=1), 1)
-        return strain
+        return strain, tf.expand_dims(thermal_gradient, 1)
     
     def stress(self, x, return_strain=False):
-        strain = self.strain(x)
+        strain, thermal_gradient = self.strain(x)
         stiffness_matrix = self.elasticity(x)
         stress = tf.matmul(stiffness_matrix, strain, transpose_b=True)
         if return_strain:
-            return stress, strain
-        return stress
+            return stress, thermal_gradient, strain
+        return stress, thermal_gradient
         
     def traction_work_done(self):
         # Return total work done by the external traction forces
@@ -96,10 +99,14 @@ class PINN_Elastic2D():
         return tf.Variable(tf.random.truncated_normal([in_dim, out_dim], stddev=xavier_stddev, dtype=tf.float64, seed=1), dtype=tf.float64, trainable=True)
     
     def strain_energy(self, x, return_strain=False, return_stress=False):
-        stress, strain = self.stress(x, return_strain=True)
-        point_wise_energy = tf.matmul(strain, stress)/2.0
-        point_wise_energy = tf.squeeze(point_wise_energy)
-        internal_energy = tf.reduce_sum(point_wise_energy*self.weights)
+        stress, thermal_gradient, strain = self.stress(x, return_strain=True)
+        mechanical_point_wise_energy = tf.matmul(strain, stress)/2.0
+        mechanical_energy = tf.squeeze(mechanical_point_wise_energy)
+        
+        thermal_point_wise_energy = 0.5*self.K*tf.matmul(thermal_gradient, thermal_gradient, transpose_b=True)
+        thermal_energy = tf.squeeze(thermal_point_wise_energy)
+
+        internal_energy = tf.reduce_sum((thermal_energy+mechanical_energy)*self.weights)
         if return_stress:
             if return_strain:
                 return stress, strain, internal_energy

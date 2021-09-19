@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from base_classes.pinn import PINN_Elastic2D
+from base_classes.thermo_mechanics_pinn import PINN_Elastic2D
 from utils.plot_functions import *
 import sys
 
@@ -21,9 +21,8 @@ plot_X, plot_Y  = tf.meshgrid(tf.linspace(0.0,0.5,1000), tf.linspace(0.0,1.5,100
 plot_nodes = tf.cast(tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1), dtype=tf.float64)
 
 class Hybrid(PINN_Elastic2D):
-    def __init__(self, E, nu, layer_sizes, lb, ub, training_nodes, weights, activation, boundary, debug):
-        super().__init__(E,
-                         nu,
+    def __init__(self, system_properties, layer_sizes, lb, ub, training_nodes, weights, activation, boundary, debug):
+        super().__init__(system_properties,
                          layer_sizes,
                          lb,
                          ub,
@@ -39,8 +38,7 @@ class Hybrid(PINN_Elastic2D):
         self.y_axis = tf.constant([[0, 1]], dtype=tf.float64)
                
     def dirichlet_bc(self, x, y):
-        #y = y*tf.expand_dims(x[:,0]**2 + x[:,1]**2, 1)/2.5
-        return self.y_axis*x*y + self.x_axis*y*tf.expand_dims(x[:,1], 1)
+        pass
 
     def traction_work_done(self, x):
         work_done = tf.reduce_mean(self.F*self(self.boundary)[:,1])*0.5
@@ -83,9 +81,9 @@ class Hybrid(PINN_Elastic2D):
 
 if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
-    pinn = Hybrid(E=1.0,
-            nu=0.3,
-            layer_sizes=[2,100, 200, 100, 2],
+    system_properties = {'E': 1.0, 'nu': 0.3, 'alpha': 1.0, 'K': 1, 'T0': 0}
+    pinn = Hybrid(system_properties,
+            layer_sizes=[2,10, 10, 3],
             lb = tf.reduce_min(gauss_points, axis=0),
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
@@ -115,7 +113,8 @@ if __name__=="__main__":
     plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape)
     plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape)
 
-    stress = pinn.stress(plot_nodes).numpy()
+    stress, _ = pinn.stress(plot_nodes)
+    stress = stress.numpy()
     plot_scaler_field(stress[:,0], title='SXX', shape=plot_X.shape)
     plot_scaler_field(stress[:,1], title='SYY', shape=plot_X.shape)
     plot_scaler_field(stress[:,2], title='SXY', shape=plot_X.shape)
