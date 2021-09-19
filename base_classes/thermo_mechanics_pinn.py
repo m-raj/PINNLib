@@ -55,7 +55,7 @@ class PINN_Elastic2D():
             self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i]))
             self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i+1]))
             self.call_counter.assign_add(1)
-        return y#self.dirichlet_bc(x, y)
+        return self.dirichlet_bc(x, y)
     
     def dirichlet_bc(self, x, y):
         pass
@@ -105,7 +105,6 @@ class PINN_Elastic2D():
         
         thermal_point_wise_energy = 0.5*self.K*tf.matmul(thermal_gradient, thermal_gradient, transpose_b=True)
         thermal_energy = tf.squeeze(thermal_point_wise_energy)
-
         internal_energy = tf.reduce_sum((thermal_energy+mechanical_energy)*self.weights)
         if return_stress:
             if return_strain:

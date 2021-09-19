@@ -38,7 +38,13 @@ class Hybrid(PINN_Elastic2D):
         self.y_axis = tf.constant([[0, 1]], dtype=tf.float64)
                
     def dirichlet_bc(self, x, y):
-        pass
+        x1, x2 = tf.split(x, 2, axis=1)
+        u1, u2, T = tf.split(y, 3, axis=1)
+        u1 = u1*x2
+        u2 = u2*x2
+        T = T*x2*(1-x2)
+        y = tf.concat([u1, u2, T], axis=1)
+        return y
 
     def traction_work_done(self, x):
         work_done = tf.reduce_mean(self.F*self(self.boundary)[:,1])*0.5
@@ -81,7 +87,7 @@ class Hybrid(PINN_Elastic2D):
 
 if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
-    system_properties = {'E': 1.0, 'nu': 0.3, 'alpha': 1.0, 'K': 1, 'T0': 0}
+    system_properties = {'E': 1.0, 'nu': 0.3, 'alpha': 1.0, 'K': 100, 'T0': 0}
     pinn = Hybrid(system_properties,
             layer_sizes=[2,10, 10, 3],
             lb = tf.reduce_min(gauss_points, axis=0),
@@ -112,6 +118,7 @@ if __name__=="__main__":
     u = pinn(plot_nodes).numpy() 
     plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape)
     plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape)
+    plot_scaler_field(u[:,2], title='T', shape=plot_X.shape)
 
     stress, _ = pinn.stress(plot_nodes)
     stress = stress.numpy()
