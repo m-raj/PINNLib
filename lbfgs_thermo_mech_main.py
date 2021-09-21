@@ -84,9 +84,9 @@ class Hybrid(PINN_Elastic2D):
 
 if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
-    system_properties = {'E': 10.0, 'nu': 0.3, 'alpha': 1.0, 'K': 100, 'T0': 0}
+    system_properties = {'E': 10.0, 'nu': 0.3, 'alpha': 0.0, 'K': 0, 'T0': 0}
     pinn = Hybrid(system_properties,
-            layer_sizes=[2, 10, 20, 30, 30, 20, 10, 3],
+            layer_sizes=[2, 20, 50, 20, 3],
             lb = tf.reduce_min(gauss_points, axis=0),
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
