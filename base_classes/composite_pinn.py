@@ -6,55 +6,72 @@ tf.keras.backend.set_floatx('float64')
 
 
 class PINN_Elastic2D():
-    def __init__(self, E, nu, layer_sizes, lb, ub, weights, activation, print_freq=10, debug=False):
+    def __init__(self, E, nu, layer_sizes, lb, ub, weights, activation, print_freq=10):
         self.E = tf.constant(E, dtype=tf.float64)
         self.nu= tf.constant(nu, dtype=tf.float64)
         self.weights = weights
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=1.0E-2)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=1.0E-3)
         self.adam_epoch = tf.Variable(0, dtype=tf.int32)
         self.adam_history = []
         self.layer_sizes = layer_sizes
         self.lb = lb
         self.ub = ub
-        self.debug_weights_mean = []
-        self.debug_weights_std = []
-        self.debug_mean = []
-        self.debug_std = []
-        self.debug_grads_mean = []
-        self.debug_grads_std = []
-        self.trainable_weights = []
         self.activation = activation
         self.print_freq = print_freq
-        self.debug = debug
         self.call_counter = tf.Variable(0, dtype=tf.int32)
-        for i in range(len(layer_sizes)-1):
-            self.trainable_weights.append(self.xavier_init(size=[layer_sizes[i], layer_sizes[i + 1]]))
-            self.trainable_weights.append(tf.Variable(tf.zeros(shape=layer_sizes[i+1], dtype= tf.float64), trainable=True))  
+
+        self.model_weights = [self.xavier_init((3,3,2,10), 'F0'),
+                self.xavier_init((3, 3, 10, 10), 'F1'),
+                self.xavier_init((3, 3, 10, 20), 'F2'),
+                self.xavier_init((3, 3, 20, 20), 'F3'),
+                self.xavier_init((3, 3, 10, 20), 'F4'),
+                self.xavier_init((3, 3, 20, 10), 'F5'),
+                self.xavier_init((3, 3, 10, 2), 'F6')]
+
+        self.biases = [tf.Variable(tf.zeros(shape=(10), dtype=tf.float64), trainable=True, name='B0'),
+          tf.Variable(tf.zeros(shape=(10), dtype=tf.float64), trainable=True, name='B1'),
+          tf.Variable(tf.zeros(shape=(20), dtype=tf.float64), trainable=True, name='B2'),
+          tf.Variable(tf.zeros(shape=(20), dtype=tf.float64), trainable=True, name='B3'),
+          tf.Variable(tf.zeros(shape=(10), dtype=tf.float64), trainable=True, name='B4'),
+          tf.Variable(tf.zeros(shape=(10), dtype=tf.float64), trainable=True, name='B5'),
+          tf.Variable(tf.zeros(shape=(2), dtype=tf.float64), trainable=True, name='B6')]
+
+        #self.trainable_weights = self.model_weights + self.biases
         
-    def __call__(self, x, debug=False):
-        y = self.preprocess(x)
-        for i in range(0, len(self.trainable_weights)-2, 2):
-            y = self.activation(tf.matmul(y, self.trainable_weights[i]) + self.trainable_weights[i+1])**2
-            if debug:
-                self.debug_mean.append(tf.reduce_mean(y))
-                self.debug_std.append(tf.math.reduce_std(y))
-                self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i]))
-                self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i+1]))
-                self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i]))
-                self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i+1]))
+    def __call__(self, input_data):
+        # x is (bath_size, 2) where the last shape corresponds to x-coord, y-coord
+        x = self.preprocess(input_data)
+        x, y = tf.split(x, 2)
+        x = tf.reshape(x, shape=(1, 256, 256, 1))
+        y = tf.reshape(y, shape=(1, 256, 256, 1))
+        x = tf.concat((x, y), axis=-1)
+        x = tf.nn.conv2d(x, filters=self.model_weights[0], strides=1, padding='SAME')
+        x = tf.nn.bias_add(x, self.biases[0])
+        x = self.activation(x)
+        x = tf.nn.conv2d(x, filters=self.model_weights[1], strides=1, padding='SAME')
+        x = tf.nn.bias_add(x, self.biases[1])
+        x = self.activation(x)
 
-        y = tf.matmul(y, self.trainable_weights[-2]) + 0.0*self.trainable_weights[-1]
-        if debug:
-            self.debug_mean.append(tf.reduce_mean(y))
-            self.debug_std.append(tf.math.reduce_std(y))
-            self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i]))
-            self.debug_weights_mean.append(tf.reduce_mean(self.trainable_weights[i+1]))
-            self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i]))
-            self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i+1]))
+        x1 = tf.nn.max_pool2d(x, ksize=2, strides=2, padding='SAME')
+        x1 = tf.nn.conv2d(x1, filters=self.model_weights[2], strides=1, padding='SAME')
+        x1 = tf.nn.bias_add(x1, self.biases[2])
+        x1 = self.activation(x1)
+        x1 = tf.nn.conv2d(x1, filters=self.model_weights[3], strides=1, padding='SAME')
+        x1 = tf.nn.bias_add(x1, self.biases[3])
+        x1 = self.activation(x1)
 
+        x1 = tf.nn.conv2d_transpose(x1, filters=self.model_weights[4], strides=2, output_shape=(1, 256, 256, 10))
+        x1 = tf.nn.bias_add(x1, self.biases[4])
+        x1 = self.activation(x1)
 
-            self.call_counter.assign_add(1)
-        return self.dirichlet_bc(x, y)
+        x = tf.concat((x, x1), axis=-1)
+        x = tf.nn.conv2d(x, filters=self.model_weights[5], strides=1, padding='SAME')
+        x = tf.nn.bias_add(x, self.biases[5])
+        x = self.activation(x)
+        x = tf.nn.conv2d(x, filters=self.model_weights[6], strides=1, padding='SAME')
+        x = tf.nn.bias_add(x, self.biases[6])
+        y = tf.reshape(tf.squeeze(x), (256*256, 2))
+        return self.dirichlet_bc(input_data, y)
     
     def dirichlet_bc(self, x, y):
         pass
@@ -62,7 +79,8 @@ class PINN_Elastic2D():
     def strain_matrix(self, x):
         with tf.GradientTape() as tape:
             tape.watch(x)
-            u = self(x, self.debug)
+            u = self(x)
+
         strain = tf.reshape(tape.batch_jacobian(u, x), (x.shape[0], 4))
         return strain
     
@@ -89,11 +107,11 @@ class PINN_Elastic2D():
     def set_other_params(self):
         pass
     
-    def xavier_init(self, size):
-        in_dim = size[0]
-        out_dim = size[1]
+    def xavier_init(self, size, name):
+        in_dim = size[0]*size[1]*size[2]
+        out_dim = size[0]*size[1]*size[3]
         xavier_stddev = np.sqrt(2.0 / (in_dim + out_dim))
-        return tf.Variable(tf.random.truncated_normal([in_dim, out_dim], stddev=xavier_stddev, dtype=tf.float64, seed=1), dtype=tf.float64, trainable=True)
+        return tf.Variable(tf.random.truncated_normal(size, stddev=xavier_stddev, dtype=tf.float64, seed=1), dtype=tf.float64, name=name, trainable=True)
     
     def strain_energy(self, x, return_strain=False, return_stress=False):
         stress, strain = self.stress(x, return_strain=True)
@@ -120,11 +138,8 @@ class PINN_Elastic2D():
     def train_step(self, x):
         with tf.GradientTape() as tape:
             loss = self.compute_loss(x)
-        grads = tape.gradient(loss, self.trainable_weights)
-        for ele in grads:
-            self.debug_grads_mean.append(tf.reduce_mean(ele))
-            self.debug_grads_std.append(tf.math.reduce_std(ele))
-        self.optimizer.apply_gradients(zip(grads, self.trainable_weights)) 
+        grads = tape.gradient(loss, self.model_weights+self.biases)
+        self.optimizer.apply_gradients(zip(grads, self.model_weights+self.biases)) 
         
         # Callbacks
         self.adam_epoch.assign_add(1)
@@ -141,31 +156,14 @@ class PINN_Elastic2D():
     def preprocess(self, x):
         y = 2.0*(x-self.lb)/(self.ub-self.lb) - 1.0
         return y
-    
-    ############## Return Debug Result ###########
-    def debug_result_out(self):
-        mean = tf.reshape(tf.convert_to_tensor(self.debug_mean), (self.call_counter, len(self.layer_sizes)-1))
-        std = tf.reshape(tf.convert_to_tensor(self.debug_std), (self.call_counter, len(self.layer_sizes)-1))
-        return mean, std
-
-    def debug_weight_result_out(self):
-        mean = tf.reshape(tf.convert_to_tensor(self.debug_weights_mean), (self.call_counter, len(self.trainable_weights)))
-        std = tf.reshape(tf.convert_to_tensor(self.debug_weights_std), (self.call_counter, len(self.trainable_weights)))
-        return mean, std
-    
-    def debug_grad_result_out(self):
-        mean = tf.reshape(tf.convert_to_tensor(self.debug_grads_mean), (self.call_counter-1, len(self.trainable_weights)))
-        std = tf.reshape(tf.convert_to_tensor(self.debug_grads_std), (self.call_counter-1, len(self.trainable_weights)))
-        return mean, std
-
-
+     
     ############## LBFGS Optimizer ###############
     
     def lbfgs_setup(self):
         part = []
         count = 0
         
-        self.shapes = tf.shape_n(self.trainable_weights)
+        self.shapes = tf.shape_n(self.model_weights + self.biases)
         self.n_tensors = len(self.shapes)
         self.idx = []
         self.lbfgs_iter = tf.Variable(0)
@@ -180,6 +178,7 @@ class PINN_Elastic2D():
     
     def assign_new_model_parameters(self, params_1d):
         params = tf.dynamic_partition(params_1d, self.part, self.n_tensors)
+        
         for i, (shape, param) in enumerate(zip(self.shapes, params)):
             self.trainable_weights[i].assign(tf.reshape(param, shape))
             
@@ -187,7 +186,7 @@ class PINN_Elastic2D():
         with tf.GradientTape() as tape:
             self.assign_new_model_parameters(params_1d)
             loss_value = self.compute_loss(self.training_nodes)
-        grads = tape.gradient(loss_value, self.trainable_weights)
+        grads = tape.gradient(loss_value, self.model_weights+self.biases)
         grads = tf.dynamic_stitch(self.idx, grads)
         
         # Callbacks
