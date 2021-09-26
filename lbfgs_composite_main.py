@@ -95,8 +95,8 @@ if __name__=="__main__":
                num_correction_pairs=20)
    
     u = pinn(plot_nodes).numpy() 
-    plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape)
-    plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape)
+    plot_scaler_field(u[:,0], title='ux', v=[0, 0.001], shape=plot_X.shape)
+    plot_scaler_field(u[:,1], title='uy', v=[-2E-4, 2E-4], shape=plot_X.shape)
 
     stress, strain = pinn.stress(plot_nodes, return_strain=True)
     stress = stress.numpy()

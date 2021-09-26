@@ -74,7 +74,7 @@ def debug_gradients(mean, std):
     plt.savefig('gradient_distribution')
     plt.show()
  
-def plot_scaler_field(field, shape, title, conditions = []):
+def plot_scaler_field(field, shape, title, v = None, conditions = []):
     for condition in conditions:
         field[condition] = np.nan
     field = field.reshape(shape)
@@ -82,7 +82,10 @@ def plot_scaler_field(field, shape, title, conditions = []):
                          'font.sans-serif':'Times New Roman',
                          'font.size':12})
     plt.figure(figsize=(5,4))
-    plt.imshow(field, cmap='jet', origin='lower')
+    if v:
+        plt.imshow(field, cmap='jet', origin='lower', vmin=v[0], vmax=v[0])
+    else:
+        plt.imshow(field, cmap='jet', origin='lower')
     plt.colorbar()
     plt.title(title)
     plt.savefig(title)

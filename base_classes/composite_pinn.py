@@ -10,7 +10,7 @@ class PINN_Elastic2D():
         self.E = tf.constant(E, dtype=tf.float64)
         self.nu= tf.constant(nu, dtype=tf.float64)
         self.weights = weights
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=1.0E-3)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=1.0E-2)
         self.adam_epoch = tf.Variable(0, dtype=tf.int32)
         self.adam_history = []
         self.layer_sizes = layer_sizes
@@ -20,20 +20,20 @@ class PINN_Elastic2D():
         self.print_freq = print_freq
         self.call_counter = tf.Variable(0, dtype=tf.int32)
 
-        self.model_weights = [self.xavier_init((3,3,2,10), 'F0'),
-                self.xavier_init((3, 3, 10, 10), 'F1'),
-                self.xavier_init((3, 3, 10, 20), 'F2'),
-                self.xavier_init((3, 3, 20, 20), 'F3'),
-                self.xavier_init((3, 3, 10, 20), 'F4'),
-                self.xavier_init((3, 3, 20, 10), 'F5'),
-                self.xavier_init((3, 3, 10, 2), 'F6')]
+        self.model_weights = [self.xavier_init((3,3,2,20), 'F0'),
+                self.xavier_init((3, 3, 20, 20), 'F1'),
+                self.xavier_init((3, 3, 20, 40), 'F2'),
+                self.xavier_init((3, 3, 40, 40), 'F3'),
+                self.xavier_init((3, 3, 20, 40), 'F4'),
+                self.xavier_init((3, 3, 40, 20), 'F5'),
+                self.xavier_init((3, 3, 20, 2), 'F6')]
 
-        self.biases = [tf.Variable(tf.zeros(shape=(10), dtype=tf.float64), trainable=True, name='B0'),
-          tf.Variable(tf.zeros(shape=(10), dtype=tf.float64), trainable=True, name='B1'),
-          tf.Variable(tf.zeros(shape=(20), dtype=tf.float64), trainable=True, name='B2'),
-          tf.Variable(tf.zeros(shape=(20), dtype=tf.float64), trainable=True, name='B3'),
-          tf.Variable(tf.zeros(shape=(10), dtype=tf.float64), trainable=True, name='B4'),
-          tf.Variable(tf.zeros(shape=(10), dtype=tf.float64), trainable=True, name='B5'),
+        self.biases = [tf.Variable(tf.zeros(shape=(20), dtype=tf.float64), trainable=True, name='B0'),
+          tf.Variable(tf.zeros(shape=(20), dtype=tf.float64), trainable=True, name='B1'),
+          tf.Variable(tf.zeros(shape=(40), dtype=tf.float64), trainable=True, name='B2'),
+          tf.Variable(tf.zeros(shape=(40), dtype=tf.float64), trainable=True, name='B3'),
+          tf.Variable(tf.zeros(shape=(20), dtype=tf.float64), trainable=True, name='B4'),
+          tf.Variable(tf.zeros(shape=(20), dtype=tf.float64), trainable=True, name='B5'),
           tf.Variable(tf.zeros(shape=(2), dtype=tf.float64), trainable=True, name='B6')]
 
         #self.trainable_weights = self.model_weights + self.biases
@@ -60,7 +60,7 @@ class PINN_Elastic2D():
         x1 = tf.nn.bias_add(x1, self.biases[3])
         x1 = self.activation(x1)
 
-        x1 = tf.nn.conv2d_transpose(x1, filters=self.model_weights[4], strides=2, output_shape=(1, 256, 256, 10))
+        x1 = tf.nn.conv2d_transpose(x1, filters=self.model_weights[4], strides=2, output_shape=(1, 256, 256, 20))
         x1 = tf.nn.bias_add(x1, self.biases[4])
         x1 = self.activation(x1)
 
