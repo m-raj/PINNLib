@@ -6,18 +6,18 @@ from utils.plot_functions import *
 import sys
 
 # Mesh
-mesh_X, mesh_Y = tf.meshgrid(tf.linspace(0.0,0.5,150), tf.linspace(0.0,1.5,450))
+mesh_X, mesh_Y = tf.meshgrid(tf.linspace(0.0,0.5,51), tf.linspace(0.0,1.5,151))
 gauss_points = tf.cast(tf.stack((tf.reshape(mesh_X, (-1,)), tf.reshape(mesh_Y, (-1,))), axis=1), dtype=tf.float64)
 Area = 0.5*1.5
-weights = Area*tf.ones((gauss_points.shape[0],), dtype=tf.float64)/(150*450)
+weights = Area*tf.ones((gauss_points.shape[0],), dtype=tf.float64)/(51*151)
 
 plot_gauss_points(gauss_points, title='Mesh')
 
 # top boundary
-top_boundary = tf.stack((tf.cast(tf.linspace(0.0, 0.5,1000), dtype=tf.float64), 1.5*tf.ones((1000,), dtype=tf.float64)), axis=1)
+top_boundary = tf.stack((tf.cast(tf.linspace(0.0, 0.5, 151), dtype=tf.float64), 1.5*tf.ones((151,), dtype=tf.float64)), axis=1)
 
 # plot nodes
-plot_X, plot_Y  = tf.meshgrid(tf.linspace(0.0,0.5,1000), tf.linspace(0.0,1.5,1000))
+plot_X, plot_Y  = tf.meshgrid(tf.linspace(0.0,0.5,151), tf.linspace(0.0,1.5,451))
 plot_nodes = tf.cast(tf.stack((tf.reshape(plot_X, (-1,)), tf.reshape(plot_Y, (-1,))), axis=1), dtype=tf.float64)
 
 class Hybrid(PINN_Elastic2D):
@@ -39,19 +39,22 @@ class Hybrid(PINN_Elastic2D):
         self.y_axis = tf.constant([[0, 1]], dtype=tf.float64)
                
     def dirichlet_bc(self, x, y):
-        #y = y*tf.expand_dims(x[:,0]**2 + x[:,1]**2, 1)/2.5
-        return self.y_axis*x*y + self.x_axis*y*tf.expand_dims(x[:,1], 1)
+        x1, x2 = tf.split(x, 2, axis=1)
+        y1, y2 = tf.split(y, 2, axis=1)
+        y1 = x2*y1
+        y2 = x2*y2
+        y = tf.concat((y1, y2), axis=1)
+        return y
 
     def traction_work_done(self, x):
         work_done = tf.reduce_mean(self.F*self(self.boundary)[:,1])*0.5
         return work_done
     
     def elasticity(self, x):
-        beta = 2.0
         C = tf.convert_to_tensor([[self.E/(1-self.nu**2), self.E*self.nu/(1-self.nu**2), 0],
                                   [self.E*self.nu/(1-self.nu**2),self.E/(1-self.nu**2), 0],
                                   [0, 0, self.E/(2*(1+self.nu))]], dtype=tf.float64)
-        gradation = tf.expand_dims(tf.expand_dims(tf.exp(beta*x[:,1]), 1), 1)
+        gradation = tf.expand_dims(tf.expand_dims(1/(1+x[:,1]), 1), 1)
         C = gradation*C
         return C
     
@@ -85,7 +88,7 @@ if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
     pinn = Hybrid(E=1.0,
             nu=0.3,
-            layer_sizes=[2,100, 200, 100, 2],
+            layer_sizes=[2,  60, 120, 60,  2],
             lb = tf.reduce_min(gauss_points, axis=0),
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
@@ -120,4 +123,6 @@ if __name__=="__main__":
     plot_scaler_field(stress[:,1], title='SYY', shape=plot_X.shape)
     plot_scaler_field(stress[:,2], title='SXY', shape=plot_X.shape)
 
-
+    np.save('stress', stress)
+    np.save('u', u)
+    np.save('adam_loss', np.asarray(pinn.adam_history))

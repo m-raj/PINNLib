@@ -102,12 +102,15 @@ if __name__=="__main__":
 
     u = pinn(plot_nodes).numpy()
     condition1 = tf.norm(plot_nodes, axis=1) < r
-    plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape, conditions=[condition1])
-    plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape, conditions=[condition1])
+    plot_scaler_field(u[:,0], title='$u_1$', shape=plot_X.shape, conditions=[condition1])
+    plot_scaler_field(u[:,1], title='$u_2$', shape=plot_X.shape, conditions=[condition1])
 
     stress = pinn.stress(plot_nodes).numpy()
-    plot_scaler_field(stress[:,0], title='SXX', shape=plot_X.shape, conditions=[condition1])
-    plot_scaler_field(stress[:,1], title='SYY', shape=plot_X.shape, conditions=[condition1])
-    plot_scaler_field(stress[:,2], title='SXY', shape=plot_X.shape, conditions=[condition1])
+    plot_scaler_field(stress[:,0], title='$\sigma_{xx}$', shape=plot_X.shape, conditions=[condition1])
+    plot_scaler_field(stress[:,1], title='$\sigma_{yy}$', shape=plot_X.shape, conditions=[condition1])
+    plot_scaler_field(stress[:,2], title='$\sigma_{xy}$', shape=plot_X.shape, conditions=[condition1])
 
-
+    np.save('u', u)
+    np.save('sigma', stress)
+    
+    np.save('adam_loss', np.asarray(pinn.adam_history))

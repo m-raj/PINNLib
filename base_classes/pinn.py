@@ -10,7 +10,7 @@ class PINN_Elastic2D():
         self.E = tf.constant(E, dtype=tf.float64)
         self.nu= tf.constant(nu, dtype=tf.float64)
         self.weights = weights
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=1.0E-2)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.5E-3)
         self.adam_epoch = tf.Variable(0, dtype=tf.int32)
         self.adam_history = []
         self.layer_sizes = layer_sizes
@@ -93,7 +93,7 @@ class PINN_Elastic2D():
         in_dim = size[0]
         out_dim = size[1]
         xavier_stddev = np.sqrt(2.0 / (in_dim + out_dim))
-        return tf.Variable(tf.random.truncated_normal([in_dim, out_dim], stddev=xavier_stddev, dtype=tf.float64, seed=1), dtype=tf.float64, trainable=True)
+        return tf.Variable(tf.random.truncated_normal([in_dim, out_dim], stddev=xavier_stddev, dtype=tf.float64), dtype=tf.float64, trainable=True)
     
     def strain_energy(self, x, return_strain=False, return_stress=False):
         stress, strain = self.stress(x, return_strain=True)

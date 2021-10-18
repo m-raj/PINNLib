@@ -6,7 +6,7 @@ from utils.plot_functions import *
 import sys
 
 # Mesh
-mesh_X, mesh_Y = tf.meshgrid(tf.linspace(0.0,0.5,150), tf.linspace(0.0,1.5,450))
+mesh_X, mesh_Y = tf.meshgrid(tf.linspace(0.0,0.5,100), tf.linspace(0.0,1.5,500))
 gauss_points = tf.cast(tf.stack((tf.reshape(mesh_X, (-1,)), tf.reshape(mesh_Y, (-1,))), axis=1), dtype=tf.float64)
 Area = 0.5*1.5
 weights = Area*tf.ones((gauss_points.shape[0],), dtype=tf.float64)/(150*450)
@@ -46,15 +46,20 @@ class Hybrid(PINN_Elastic2D):
         y = tf.concat([u1, u2, T], axis=1)
         return y
 
+      
+
     def traction_work_done(self, x):
-        work_done = tf.reduce_mean(self.F*self(self.boundary)[:,1])*0.5
+        work_done = tf.reduce_mean(self.F*self.adam_epoch.numpy()/1000*self(self.boundary)[:,1])*0.5
         return work_done
     
     def elasticity(self, x):
+        beta = 2.0
         C = tf.convert_to_tensor([[self.E/(1-self.nu**2), self.E*self.nu/(1-self.nu**2), 0],
                                   [self.E*self.nu/(1-self.nu**2),self.E/(1-self.nu**2), 0],
                                   [0, 0, self.E/(2*(1+self.nu))]], dtype=tf.float64)
-        return C
+
+        gradation = tf.expand_dims(tf.expand_dims(tf.exp(beta*x[:,1]), 1), 1)
+        return gradation*C
     
 
     def train(self, adam_steps=100, lbfgs=False, max_iterations=100, num_correction_pairs=10, max_line_search_iterations=50):
@@ -84,16 +89,16 @@ class Hybrid(PINN_Elastic2D):
 
 if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
-    system_properties = {'E': 10.0, 'nu': 0.3, 'alpha': 0.0, 'K': 0, 'T0': 0}
+    system_properties = {'E': 1.0, 'nu': 0.3, 'alpha': 0.5, 'K': 1.0, 'T0': 0}
     pinn = Hybrid(system_properties,
-            layer_sizes=[2, 20, 50, 20, 3],
+            layer_sizes=[2, 300, 300, 3],
             lb = tf.reduce_min(gauss_points, axis=0),
             ub = tf.reduce_max(gauss_points, axis=0),
             training_nodes=gauss_points,
             weights=weights,
-            activation = tf.nn.tanh,
+            activation = tf.nn.leaky_relu,
             boundary=top_boundary,
-            debug=True)
+            debug=False)
 
     pinn.set_other_params(F=1.0)
     
@@ -123,4 +128,7 @@ if __name__=="__main__":
     plot_scaler_field(stress[:,1], title='SYY', shape=plot_X.shape)
     plot_scaler_field(stress[:,2], title='SXY', shape=plot_X.shape)
 
+    abaqus_nodes = tf.convert_to_tensor(np.load('nodes.npy'), dtype=tf.float64)
+    prediction = pinn(abaqus_nodes).numpy()
+    np.save('prediction.npy', prediction)
 

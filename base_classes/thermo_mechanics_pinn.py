@@ -56,6 +56,7 @@ class PINN_Elastic2D():
             self.debug_weights_std.append(tf.math.reduce_std(self.trainable_weights[i+1]))
             self.call_counter.assign_add(1)
         return self.dirichlet_bc(x, y)
+
     
     def dirichlet_bc(self, x, y):
         pass
