@@ -10,7 +10,7 @@ class PINN_Elastic2D():
         self.E = tf.constant(E, dtype=tf.float64)
         self.nu= tf.constant(nu, dtype=tf.float64)
         self.weights = weights
-        self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.5E-3)
+        self.optimizer = tf.keras.optimizers.Adam(learning_rate=0.8E-3)
         self.adam_epoch = tf.Variable(0, dtype=tf.int32)
         self.adam_history = []
         self.layer_sizes = layer_sizes

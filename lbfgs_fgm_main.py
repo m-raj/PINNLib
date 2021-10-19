@@ -42,12 +42,12 @@ class Hybrid(PINN_Elastic2D):
         x1, x2 = tf.split(x, 2, axis=1)
         y1, y2 = tf.split(y, 2, axis=1)
         y1 = x2*y1
-        y2 = x2*y2
+        y2 = x2/1.5 +  (1.5-x2)*x2*y2
         y = tf.concat((y1, y2), axis=1)
         return y
 
     def traction_work_done(self, x):
-        work_done = tf.reduce_mean(self.F*self(self.boundary)[:,1])*0.5
+        work_done = 0#tf.reduce_mean(self.F*self(self.boundary)[:,1])*0.5
         return work_done
     
     def elasticity(self, x):
