@@ -11,8 +11,8 @@ class PINN_Elastic2D():
         self.nu= tf.constant(nu, dtype=tf.float64)
         self.weights1 = weights[0]
         self.weights2 = weights[1]
-        self.optimizer1 = tf.keras.optimizers.Adam(learning_rate=0.8E-3)
-        self.optimizer2 = tf.keras.optimizers.Adam(learning_rate=0.8E-3)
+        self.optimizer1 = tf.keras.optimizers.Adam(learning_rate=1.0E-2)
+        self.optimizer2 = tf.keras.optimizers.Adam(learning_rate=1.0E-2)
         self.adam_epoch = tf.Variable(0, dtype=tf.int32)
         self.adam_history_1 = []
         self.adam_history_2 = []
@@ -108,31 +108,38 @@ class PINN_Elastic2D():
             else:
                 return internal_energy
     
-    def compute_loss(self, x1, x2, xi):
-        strain_energy_1 = self.strain_energy(x1, 1)
-        strain_energy_2 = self.strain_energy(x2, 2)
+    def compute_loss(self, x, xi, domain):
+        if domain==1:
+            strain_energy = self.strain_energy(x, 1)
+        else:
+            strain_energy = self.strain_energy(x, 2)
         interface_loss = self.subdomain_interface_loss(xi)
-        loss1 = strain_energy_1 + interface_loss
-        loss2 = strain_energy_2 + interface_loss
-        return loss1, loss2, interface_loss
+        loss = strain_energy + 100*interface_loss
+        return loss, interface_loss
 
     def subdomain_interface_loss(self, x):
         y1 = self(x, 1)
         y2 = self(x, 2)
-        e1 = self.strain(x, 1)
-        e2 = self.strain(x, 2)
+        e1 = self.strain_matrix(x, 1)
+        e2 = self.strain_matrix(x, 2)
         return tf.reduce_mean(abs(y1-y2)) + tf.reduce_mean(abs(e1-e2))
     
     def train_step(self, x1, x2, xi):
         with tf.GradientTape() as tape:
-            loss1, loss2, interface_loss = self.compute_loss(x1, x2, xi)
-        grads1 = tape.gradient(loss1, self.trainable_weights1)
-        #grads2 = tape.gradient(loss2, self.trainable_weights2)
-        self.optimizer1.apply_gradients(zip(grads1, self.trainable_weights1)) 
-        #self.optimizer2.apply_gradients(zip(grads2, self.trainable_weights2))
+            loss1, interface_loss = self.compute_loss(x1, xi, 1)
+        grads = tape.gradient(loss1, self.trainable_weights1)
+        self.optimizer1.apply_gradients(zip(grads, self.trainable_weights1))
+        with tf.GradientTape() as tape:
+            loss2, interface_loss = self.compute_loss(x2, xi, 2)
+        grads = tape.gradient(loss2, self.trainable_weights2) 
+        self.optimizer2.apply_gradients(zip(grads, self.trainable_weights2))
         
         # Callbacks
         self.adam_epoch.assign_add(1)
+        if self.adam_epoch == 250:
+            self.optimizer1.learning_rate.assign(0.5E-3)
+            self.optimizer1.learning_rate.assign(0.5E-3)
+            print("LR update")
         tf.py_function(self.adam_history_1.append, inp=[loss1], Tout=[])
         tf.py_function(self.adam_history_2.append, inp=[loss2], Tout=[])
         if not(self.adam_epoch%self.print_freq):

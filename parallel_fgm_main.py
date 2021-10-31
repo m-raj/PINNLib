@@ -6,14 +6,15 @@ from utils.plot_functions import *
 import sys
 
 # Mesh
-mesh_X, mesh_Y = tf.meshgrid(tf.linspace(0.0,0.5,31), tf.linspace(0.0,1.5,91))
+mesh_X, mesh_Y = tf.meshgrid(tf.linspace(0.0,0.5,51), tf.linspace(0.0,1.5,151))
 gauss_points = tf.cast(tf.stack((tf.reshape(mesh_X, (-1,)), tf.reshape(mesh_Y, (-1,))), axis=1), dtype=tf.float64)
-interface_condition = tf.norm(gauss_points-tf.convert_to_tensor([0.25, 0], dtype=tf.float64), axis=1) < 0.26
+r = 0.01
+interface_condition = tf.norm(gauss_points-tf.convert_to_tensor([0.25, 0], dtype=tf.float64), axis=1) < r
 x1 = gauss_points[interface_condition]
 x2 = gauss_points[tf.math.logical_not(interface_condition)]
 theta = tf.linspace(0.0,np.pi,200)
-xi1 = 0.26*tf.cos(theta)
-xi2 = 0.26*tf.sin(theta)
+xi1 = r*tf.cos(theta)
+xi2 = r*tf.sin(theta)
 xi = tf.cast(tf.stack((tf.reshape(xi1, (-1,)), tf.reshape(xi2, (-1,))), axis=1), dtype=tf.float64)
 Area = 0.5*1.5
 a1 = Area*x1.shape[0]/gauss_points.shape[0]
@@ -64,7 +65,7 @@ class Hybrid(PINN_Elastic2D):
         x1, x2 = tf.split(x, 2, axis=1)
         y1, y2 = tf.split(y, 2, axis=1)
         y1 = x2*y1
-        y2 = x2/1.5 +  (1.5-x2)*y2
+        y2 = x2/1.5 +  x2*(1.5-x2)*y2
         y = tf.concat((y1, y2), axis=1)
         return y
 
@@ -111,8 +112,8 @@ if __name__=="__main__":
     tf.keras.backend.set_floatx("float64")
     pinn = Hybrid(E=1.0,
             nu=0.3,
-            layer_sizes1=[2, 20, 50, 20, 2],
-            layer_sizes2=[2, 20, 50, 20, 2],
+            layer_sizes1=[2, 60, 150, 60, 2],
+            layer_sizes2=[2, 60, 150, 60, 2],
             lb1 = tf.reduce_min(x1, axis=0),
             ub1 = tf.reduce_max(x1, axis=0),
             lb2 = tf.reduce_min(x2, axis=0),
@@ -133,22 +134,22 @@ if __name__=="__main__":
 
     u1 = pinn(plot_nodes, domain=1) 
     u2 = pinn(plot_nodes, domain=2)
-    condition = tf.expand_dims(tf.cast(tf.norm(plot_nodes-tf.convert_to_tensor([0.25, 0], dtype=tf.float64), axis=1) < 0.26, dtype=tf.float64), axis=1)
+    condition = tf.expand_dims(tf.cast(tf.norm(plot_nodes-tf.convert_to_tensor([0.25, 0], dtype=tf.float64), axis=1) < r, dtype=tf.float64), axis=1)
     u = u1*condition + u2*(1-condition)
     u = u.numpy()
     plot_scaler_field(u[:,0], title='ux', shape=plot_X.shape)
     plot_scaler_field(u[:,1], title='uy', shape=plot_X.shape)
 
-    stress1 = pinn.stress(plot_nodes, domain=1)
-    stress2 = pinn.stress(plot_nodes, domain=2)
+    stress1 = pinn.strain(plot_nodes, domain=1)
+    stress2 = pinn.strain(plot_nodes, domain=2)
     condition = tf.expand_dims(condition, axis=1)
     stress = stress1*condition + stress2*(1-condition)
     stress = stress.numpy()
-    plot_scaler_field(stress[:,0], title='SXX', shape=plot_X.shape)
-    plot_scaler_field(stress[:,1], title='SYY', shape=plot_X.shape)
-    plot_scaler_field(stress[:,2], title='SXY', shape=plot_X.shape)
+    plot_scaler_field(stress[:,:,0], title='EXX', shape=plot_X.shape)
+    plot_scaler_field(stress[:,:,1], title='EYY', shape=plot_X.shape)
+    plot_scaler_field(stress[:,:,2], title='EXY', shape=plot_X.shape)
 
-    np.save('stress', stress)
+    np.save('strain', stress)
     np.save('u', u)
     np.save('adam_loss_1', np.asarray(pinn.adam_history_1))
     np.save('adam_loss_2', np.asarray(pinn.adam_history_2))
